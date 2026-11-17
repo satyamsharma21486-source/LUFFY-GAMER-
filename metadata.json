@@ -1,0 +1,6 @@
+{
+  "name": "Script Hub",
+  "description": "A sleek dark-themed Script & Content Showcase Platform with neon glassmorphism cards, media previews, and instant script copying.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

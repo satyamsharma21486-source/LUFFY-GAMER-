@@ -1,0 +1,37 @@
+<resources>
+    <string name="app_name">Script Hub</string>
+    <string name="brand_title">SCRIPT HUB</string>
+    <string name="brand_subtitle">CURATED CODE &amp; CONTENT SHOWCASE</string>
+    <string name="action_create">Create +</string>
+    <string name="action_get_script">Get Script</string>
+    <string name="action_hide_script">Hide Script</string>
+    <string name="action_copy_script">Copy Script</string>
+    <string name="action_copied">Copied! ✓</string>
+    <string name="action_publish">Publish Script</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_pick_photo">Select Photo from Device</string>
+    <string name="action_change_photo">Change Photo</string>
+    <string name="hint_click_to_view">Click to view</string>
+    <string name="hint_expanded">Expanded</string>
+    <string name="modal_create_title">Publish New Script</string>
+    <string name="modal_create_subtitle">Share a snippet, shader, or automation with the hub</string>
+    <string name="label_title">Title</string>
+    <string name="placeholder_title">e.g. Neon Shader Particle Engine</string>
+    <string name="label_photo">Cover Photo</string>
+    <string name="label_script">Script / Content</string>
+    <string name="placeholder_script">Paste or type your script, code, or text here...</string>
+    <string name="error_title_required">Please enter a title.</string>
+    <string name="error_script_required">Please enter your script or content.</string>
+    <string name="empty_title">No scripts published yet</string>
+    <string name="empty_subtitle">Tap Create + in the top bar to publish your first script card.</string>
+    <string name="cd_delete_card">Delete script card</string>
+    <string name="cd_close_modal">Close modal</string>
+    <string name="cd_script_thumbnail">Script preview cover image</string>
+    <string name="cd_photo_preview">Selected cover photo preview</string>
+    <string name="placeholder_search">Search scripts by title...</string>
+    <string name="cd_clear_search">Clear search query</string>
+    <string name="empty_search_title">No matching scripts</string>
+    <string name="empty_search_subtitle">No script titles matched your search. Try a different keyword or clear the filter.</string>
+    <string name="action_clear_search">Clear Search</string>
+</resources>
