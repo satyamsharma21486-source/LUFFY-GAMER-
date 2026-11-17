@@ -24,9 +24,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -58,6 +60,7 @@ import com.example.ui.theme.TextSecondary
 fun ScriptHubTopBar(
     scriptCount: Int,
     onCreateClick: () -> Unit,
+    onSignOutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "navbar_glow")
@@ -217,6 +220,22 @@ fun ScriptHubTopBar(
                         modifier = Modifier.size(18.dp)
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            IconButton(
+                onClick = onSignOutClick,
+                modifier = Modifier
+                    .testTag("sign_out_button")
+                    .size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.Logout,
+                    contentDescription = stringResource(R.string.cd_sign_out),
+                    tint = TextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }

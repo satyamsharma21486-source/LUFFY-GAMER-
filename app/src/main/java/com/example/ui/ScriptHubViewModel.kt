@@ -1,22 +1,33 @@
 package com.example.ui
 
-import android.app.Application
 import android.net.Uri
-import androidx.lifecycle.AndroidViewModel
+import android.util.Log
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.ScriptDatabase
-import com.example.data.ScriptEntity
+import com.example.data.ScriptItem
 import com.example.data.ScriptRepository
+import com.google.firebase.firestore.FirebaseFirestoreException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+sealed interface ScriptsFeedState {
+    data object Loading : ScriptsFeedState
+    data class Success(
+        val scripts: List<ScriptItem>,
+        val totalCount: Int
+    ) : ScriptsFeedState
+    data class Error(val message: String) : ScriptsFeedState
+}
 
 data class CreateModalState(
     val isOpen: Boolean = false,
@@ -29,67 +40,112 @@ data class CreateModalState(
 )
 
 data class ScriptHubUiState(
-    val scripts: List<ScriptEntity> = emptyList(),
-    val totalScriptCount: Int = 0,
+    val feedState: ScriptsFeedState = ScriptsFeedState.Loading,
     val searchQuery: String = "",
-    val expandedCardIds: Set<Long> = emptySet(),
-    val revealedScriptIds: Set<Long> = emptySet(),
-    val copiedCardId: Long? = null,
+    val expandedCardIds: Set<String> = emptySet(),
+    val revealedScriptIds: Set<String> = emptySet(),
+    val copiedCardId: String? = null,
+    val actionError: String? = null,
     val modalState: CreateModalState = CreateModalState()
 )
 
-class ScriptHubViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository: ScriptRepository = ScriptRepository(
-        context = application,
-        dao = ScriptDatabase.getInstance(application).scriptDao()
-    )
+class ScriptHubViewModel(
+    private val repository: ScriptRepository,
+    private val currentUserId: String
+) : ViewModel() {
 
     private val searchQuery = MutableStateFlow("")
-    private val expandedCardIds = MutableStateFlow<Set<Long>>(emptySet())
-    private val revealedScriptIds = MutableStateFlow<Set<Long>>(emptySet())
-    private val copiedCardId = MutableStateFlow<Long?>(null)
+    private val expandedCardIds = MutableStateFlow<Set<String>>(emptySet())
+    private val revealedScriptIds = MutableStateFlow<Set<String>>(emptySet())
+    private val copiedCardId = MutableStateFlow<String?>(null)
+    private val actionError = MutableStateFlow<String?>(null)
     private val modalState = MutableStateFlow(CreateModalState())
     private var copyResetJob: Job? = null
 
-    private val filteredScriptsFlow = combine(
-        repository.scriptsFlow,
-        searchQuery
-    ) { scripts, query ->
-        val trimmed = query.trim()
-        val filtered = if (trimmed.isEmpty()) {
-            scripts
-        } else {
-            scripts.filter { it.title.contains(trimmed, ignoreCase = true) }
-        }
-        Triple(filtered, scripts.size, query)
+    private sealed interface UpstreamSnapshot {
+        data object Loading : UpstreamSnapshot
+        data class Loaded(val items: List<ScriptItem>) : UpstreamSnapshot
+        data class Failed(val message: String) : UpstreamSnapshot
     }
 
-    val uiState: StateFlow<ScriptHubUiState> = combine(
-        filteredScriptsFlow,
+    private val upstreamScripts: StateFlow<UpstreamSnapshot> =
+        repository.observeScripts(currentUserId)
+            .map<List<ScriptItem>, UpstreamSnapshot> { UpstreamSnapshot.Loaded(it) }
+            .catch { error ->
+                val firestoreError = generateSequence(error) { it.cause }
+                    .filterIsInstance<FirebaseFirestoreException>()
+                    .firstOrNull()
+                if (firestoreError == null && error is CancellationException) throw error
+                val rootError = firestoreError ?: error
+                Log.w(TAG, "Error observing scripts", rootError)
+                emit(UpstreamSnapshot.Failed(rootError.localizedMessage ?: "Failed to load scripts"))
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = UpstreamSnapshot.Loading
+            )
+
+    private val filteredFeedFlow = combine(upstreamScripts, searchQuery) { snapshot, query ->
+        val feedState = when (snapshot) {
+            is UpstreamSnapshot.Loading -> ScriptsFeedState.Loading
+            is UpstreamSnapshot.Failed -> ScriptsFeedState.Error(snapshot.message)
+            is UpstreamSnapshot.Loaded -> {
+                val trimmed = query.trim()
+                val filtered = if (trimmed.isEmpty()) {
+                    snapshot.items
+                } else {
+                    snapshot.items.filter { it.title.contains(trimmed, ignoreCase = true) }
+                }
+                ScriptsFeedState.Success(scripts = filtered, totalCount = snapshot.items.size)
+            }
+        }
+        feedState to query
+    }
+
+    private val interactionFlow = combine(
         expandedCardIds,
         revealedScriptIds,
         copiedCardId,
+        actionError,
         modalState
-    ) { (filteredScripts, totalCount, query), expanded, revealed, copiedId, modal ->
+    ) { expanded, revealed, copiedId, err, modal ->
+        InteractionSnapshot(expanded, revealed, copiedId, err, modal)
+    }
+
+    private data class InteractionSnapshot(
+        val expandedCardIds: Set<String>,
+        val revealedScriptIds: Set<String>,
+        val copiedCardId: String?,
+        val actionError: String?,
+        val modalState: CreateModalState
+    )
+
+    val uiState: StateFlow<ScriptHubUiState> = combine(
+        filteredFeedFlow,
+        interactionFlow
+    ) { (feedState, query), interaction ->
         ScriptHubUiState(
-            scripts = filteredScripts,
-            totalScriptCount = totalCount,
+            feedState = feedState,
             searchQuery = query,
-            expandedCardIds = expanded,
-            revealedScriptIds = revealed,
-            copiedCardId = copiedId,
-            modalState = modal
+            expandedCardIds = interaction.expandedCardIds,
+            revealedScriptIds = interaction.revealedScriptIds,
+            copiedCardId = interaction.copiedCardId,
+            actionError = interaction.actionError,
+            modalState = interaction.modalState
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
         initialValue = ScriptHubUiState()
     )
 
     init {
         viewModelScope.launch {
-            repository.ensureSeededIfFirstLaunch()
+            val result = repository.ensureSeededForUser(currentUserId)
+            result.onFailure { err ->
+                actionError.value = err.localizedMessage ?: "Could not initialize sample scripts"
+            }
         }
     }
 
@@ -101,7 +157,11 @@ class ScriptHubViewModel(application: Application) : AndroidViewModel(applicatio
         searchQuery.value = ""
     }
 
-    fun onCardClicked(scriptId: Long) {
+    fun dismissActionError() {
+        actionError.value = null
+    }
+
+    fun onCardClicked(scriptId: String) {
         expandedCardIds.update { current ->
             if (scriptId in current) {
                 revealedScriptIds.update { it - scriptId }
@@ -112,13 +172,13 @@ class ScriptHubViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun onGetScriptClicked(scriptId: Long) {
+    fun onGetScriptClicked(scriptId: String) {
         revealedScriptIds.update { current ->
             if (scriptId in current) current - scriptId else current + scriptId
         }
     }
 
-    fun onScriptCopied(scriptId: Long) {
+    fun onScriptCopied(scriptId: String) {
         copyResetJob?.cancel()
         copiedCardId.value = scriptId
         copyResetJob = viewModelScope.launch {
@@ -129,11 +189,14 @@ class ScriptHubViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun onDeleteScript(script: ScriptEntity) {
+    fun onDeleteScript(script: ScriptItem) {
         viewModelScope.launch {
             expandedCardIds.update { it - script.id }
             revealedScriptIds.update { it - script.id }
-            repository.deleteScript(script)
+            val result = repository.deleteScript(currentUserId, script)
+            result.onFailure { err ->
+                actionError.value = err.localizedMessage ?: "Failed to delete script"
+            }
         }
     }
 
@@ -146,11 +209,13 @@ class ScriptHubViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun onTitleChanged(newTitle: String) {
-        modalState.update { it.copy(title = newTitle, titleError = null) }
+        val capped = newTitle.take(ScriptRepository.MAX_TITLE_LENGTH)
+        modalState.update { it.copy(title = capped, titleError = null) }
     }
 
     fun onScriptContentChanged(newContent: String) {
-        modalState.update { it.copy(scriptContent = newContent, scriptError = null) }
+        val capped = newContent.take(ScriptRepository.MAX_SCRIPT_LENGTH)
+        modalState.update { it.copy(scriptContent = capped, scriptError = null) }
     }
 
     fun onPhotoSelected(uri: Uri?) {
@@ -174,12 +239,23 @@ class ScriptHubViewModel(application: Application) : AndroidViewModel(applicatio
 
         modalState.update { it.copy(isPublishing = true) }
         viewModelScope.launch {
-            repository.createScript(
+            val result = repository.createScript(
+                userId = currentUserId,
                 title = trimmedTitle,
                 scriptContent = trimmedScript,
                 pickedPhotoUri = current.selectedPhotoUri
             )
-            modalState.value = CreateModalState(isOpen = false)
+            result.onSuccess {
+                modalState.value = CreateModalState(isOpen = false)
+            }.onFailure { err ->
+                modalState.update { it.copy(isPublishing = false) }
+                actionError.value = err.localizedMessage ?: "Failed to publish script"
+            }
         }
+    }
+
+    private companion object {
+        const val TAG = "ScriptHubVM"
+        const val STOP_TIMEOUT_MILLIS = 5000L
     }
 }

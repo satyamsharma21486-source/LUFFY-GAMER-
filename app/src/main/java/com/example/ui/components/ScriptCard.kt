@@ -81,10 +81,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.R
-import com.example.data.ScriptEntity
+import com.example.data.ScriptItem
 import com.example.ui.theme.BorderGlass
 import com.example.ui.theme.CodeBoxBg
-import com.example.ui.theme.DeepSpaceBg
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.NeonCrimson
 import com.example.ui.theme.NeonCyan
@@ -95,12 +94,13 @@ import com.example.ui.theme.SurfaceGlassElevated
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.google.firebase.Timestamp
 import kotlinx.coroutines.delay
 import java.io.File
 
 @Composable
 fun ScriptCard(
-    script: ScriptEntity,
+    script: ScriptItem,
     index: Int,
     isExpanded: Boolean,
     isScriptRevealed: Boolean,
@@ -161,9 +161,10 @@ fun ScriptCard(
     )
 
     val cardShape = RoundedCornerShape(20.dp)
-    val relativeTime = remember(script.createdAtMillis) {
+    val displayTimestamp = script.updatedAt ?: script.createdAt ?: Timestamp.now()
+    val relativeTime = remember(displayTimestamp) {
         DateUtils.getRelativeTimeSpanString(
-            script.createdAtMillis,
+            displayTimestamp.toDate().time,
             System.currentTimeMillis(),
             DateUtils.MINUTE_IN_MILLIS
         ).toString()
@@ -245,7 +246,7 @@ fun ScriptCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ScriptThumbnail(
-                    imagePath = script.imagePath,
+                    imagePath = script.localImagePath,
                     sampleDrawableName = script.sampleDrawableName
                 )
 
@@ -531,7 +532,7 @@ private fun ScriptThumbnail(
 
 @Composable
 private fun RevealedScriptBox(
-    scriptId: Long,
+    scriptId: String,
     scriptContent: String,
     isCopied: Boolean,
     onCopyClick: () -> Unit

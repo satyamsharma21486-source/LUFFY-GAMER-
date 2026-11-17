@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidScript(data, userId) {
+      return data.userId is string &&
+             data.userId == request.auth.uid &&
+             data.userId == userId &&
+             data.title is string &&
+             data.title.size() >= 1 &&
+             data.title.size() <= 120 &&
+             data.scriptContent is string &&
+             data.scriptContent.size() >= 1 &&
+             data.scriptContent.size() <= 50000 &&
+             (!('localImagePath' in data) || (data.localImagePath is string && data.localImagePath.size() <= 500)) &&
+             (!('sampleDrawableName' in data) || (data.sampleDrawableName is string && data.sampleDrawableName.size() <= 120)) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    match /users/{userId}/scripts/{scriptId} {
+      allow get: if isOwner(userId) && isValidId(scriptId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(scriptId) &&
+                       incoming().keys().hasAll(['userId', 'title', 'scriptContent', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'title', 'scriptContent', 'localImagePath', 'sampleDrawableName', 'createdAt', 'updatedAt']) &&
+                       isValidScript(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(scriptId) &&
+                       isValidScript(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'scriptContent', 'localImagePath', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(scriptId);
+    }
+  }
+}

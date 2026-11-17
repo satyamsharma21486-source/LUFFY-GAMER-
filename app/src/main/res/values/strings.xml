@@ -34,4 +34,7 @@
     <string name="empty_search_title">No matching scripts</string>
     <string name="empty_search_subtitle">No script titles matched your search. Try a different keyword or clear the filter.</string>
     <string name="action_clear_search">Clear Search</string>
+    <string name="auth_subtitle">Sign in with Google to sync your scripts securely across your cloud vault.</string>
+    <string name="action_sign_in_google">Sign in with Google</string>
+    <string name="cd_sign_out">Sign out</string>
 </resources>

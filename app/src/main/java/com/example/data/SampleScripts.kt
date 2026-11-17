@@ -1,11 +1,18 @@
 package com.example.data
 
+data class SampleScriptSeed(
+    val docId: String,
+    val title: String,
+    val sampleDrawableName: String,
+    val scriptContent: String
+)
+
 object SampleScripts {
-    fun buildSamples(nowMillis: Long): List<ScriptEntity> = listOf(
-        ScriptEntity(
+    fun buildSamples(): List<SampleScriptSeed> = listOf(
+        SampleScriptSeed(
+            docId = "sample_neon_shader",
             title = "Neon Shader Particle Engine",
             sampleDrawableName = "img_sample_shader_1794887932883",
-            createdAtMillis = nowMillis - 1000L * 60 * 14,
             scriptContent = """
                 // GLSL Fragment Shader — Cybernetic Particle Field
                 precision highp float;
@@ -28,10 +35,10 @@ object SampleScripts {
                 }
             """.trimIndent()
         ),
-        ScriptEntity(
+        SampleScriptSeed(
+            docId = "sample_quantum_middleware",
             title = "Quantum Edge Auth Middleware",
             sampleDrawableName = "img_sample_quantum_1794887934325",
-            createdAtMillis = nowMillis - 1000L * 60 * 60 * 3,
             scriptContent = """
                 // TypeScript Edge Middleware — Token & Burst Guard
                 export async function verifyQuantumSession(req: Request): Promise<Response | null> {
@@ -53,10 +60,10 @@ object SampleScripts {
                 }
             """.trimIndent()
         ),
-        ScriptEntity(
+        SampleScriptSeed(
+            docId = "sample_pulse_cli",
             title = "Pulse CLI Task Automator",
             sampleDrawableName = "img_sample_terminal_1794887934461",
-            createdAtMillis = nowMillis - 1000L * 60 * 60 * 22,
             scriptContent = """
                 #!/usr/bin/env bash
                 set -euo pipefail

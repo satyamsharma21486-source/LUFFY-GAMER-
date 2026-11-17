@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "Script": {
+      "title": "Script",
+      "description": "A user-authored script or code showcase card synced in Cloud Firestore.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase UID of the script owner."
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title of the script card (1 to 120 characters)."
+        },
+        "scriptContent": {
+          "type": "string",
+          "description": "Full script, code snippet, or text payload (1 to 50000 characters)."
+        },
+        "localImagePath": {
+          "type": "string",
+          "description": "Optional on-device path to a locally stored cover image."
+        },
+        "sampleDrawableName": {
+          "type": "string",
+          "description": "Optional bundled drawable resource name for seeded sample cards."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() at creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on create/update."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "scriptContent",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/scripts/{scriptId}": {
+      "schema": {
+        "$ref": "#/entities/Script"
+      },
+      "description": "User-isolated collection of script showcase cards owned by {userId}."
+    }
+  }
+}
